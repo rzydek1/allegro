@@ -16,55 +16,90 @@ class Data:
         self.headers['Accept'] = 'application/vnd.allegro.beta.v1+json'
         self.headers['Authorization'] = "Bearer {}".format(self.access_token)
 
-    def get_orders(self, last_actualization):
+    def check_last_event(self, event_id):
+        """if last_event is the same return True, that seems if there isn't new event return True, else return False"""
+
+        if self.get_latest_event() == event_id:
+            return True
+
+        return False
+
+    def get_latest_event(self):
 
         with requests.Session() as session:
             session.headers.update(self.headers)
 
-            response = session.get(self.data_url + '/order/checkout-forms',
-                                   params={'lineItems.boughtAt.gte': last_actualization})
+            latest_event = session.get(self.data_url + '/order/event-stats')
 
-            if len(response.json()['checkoutForms']) == 0:
-                print('brak zamowien')
-                return -1
-            else:
-                print('Ilosc zamowien: {}'.format(len(response.json()['checkoutForms'])))
+            if latest_event:
+                return latest_event.json()['latestEvent']['id']
 
-                return response.json()
+    def get_events(self, event_id):
 
-    def save_orders(self, last_actualization):
+        with requests.Session() as session:
+            session.headers.update(self.headers)
 
-        data = self.get_orders(last_actualization)
-        db_success_flag = False
+            events = session.get(self.data_url + '/order/events',
+                                 params={'from': event_id})
 
-        if data != -1:
+            if events:
+                return events.json()
+
+    def get_order_details(self, order_id):
+
+        with requests.Session() as session:
+            session.headers.update(self.headers)
+
+            response = session.get(self.data_url + '/order/checkout-forms/{}'.format(order_id))
+
+            return response.json()
+
+    def save_orders(self, last_event):
+
+        print(last_event)
+        data = self.get_events(last_event)
+        print(len(data['events']))
+
+        try:
+
             with db_manager.DBManager() as db:
-                for order in data['checkoutForms']:
+                if db.check_base():
+                    for event in data['events']:
 
-                    if not db.find_order_by_id(order['id']):
+                        print('id: {},\noccurredAt: {}'.format(event['id'], event['occurredAt']))
 
-                        address_id = db.find_delivery_address_id(order['delivery']['address'])
+                        time_stamp = event['occurredAt']
+                        order = self.get_order_details(event['order']['checkoutForm']['id'])
 
-                        db_success_flag = db.add_buyer(order['buyer'])
-                        db_success_flag = db.add_delivery_address(order['buyer']['id'], address_id, order['delivery']['address'])
-                        db_success_flag = db.add_order(order['id'],
-                                                        order['buyer']['id'],
-                                                        address_id,
-                                                        order['status'],
-                                                        order['payment']['type'],
-                                                        order['delivery']['method']['name'],
-                                                        order['summary']['totalToPay']['amount'],
-                                                        order['messageToSeller'] if 'messageToSeller' in order else '',
-                                                        order['payment']['finishedAt'] if 'finishedAt' in order['payment'] else last_actualization)
-                        db_success_flag = db.connect_address_buyer(order['buyer']['id'], address_id)
+                        if not db.find_order_by_id(order['id']):
 
+                            address_id = db.find_delivery_address_id(order['delivery']['address'])
 
-                        if not db_success_flag:
-                            print('Nie udało sie zapisać danych w bazie danych!')
-                            return -1
-                        
-                db.print_values()
-                return 1
-        
+                            db.add_buyer(order['buyer'])
+                            db.add_delivery_address(address_id, order['delivery']['address'])
+                            db.add_order(order['id'],
+                                         order['buyer']['id'],
+                                         address_id,
+                                         order['status'],
+                                         order['payment']['type'],
+                                         order['delivery']['method']['name'],
+                                         order['summary']['totalToPay']['amount'],
+                                         order['messageToSeller'] if 'messageToSeller' in order else '',
+                                         time_stamp)
+                            db.connect_address_buyer(order['buyer']['id'], address_id)
+
+                            print('len(lineItems): {}'.format(len(order['lineItems'])))
+                            for item in order['lineItems']:
+                                db.add_item(item['offer']['id'],
+                                            item['offer']['name'],
+                                            item['price']['amount'])
+                                db.connect_order_item(order['id'], item['offer']['id'], item['quantity'])
+
+                    db.print_values()
+                    return 1
+
+        except KeyError as e:
+            print('KeyError: {}'.format(e))
+            return 0
+
         return 0
-        

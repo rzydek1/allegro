@@ -9,9 +9,7 @@ client_id = "9d07cbc64b89450e8665e4149e1dc617"
 client_basic64 = 'OWQwN2NiYzY0Yjg5NDUwZTg2NjVlNDE0OWUxZGM2MTc6VHZjdXlZa0JvZkVpSUc5bXpxSm9LeFE0M3ZRWWh5dzNmZ2U1RE5OZERiMGNZMGpkNnBLRE9VdHJrU3YyVEx6ZA=='
 
 auth = authorization.Auth(client_id, client_basic64)
-last_actualization = datetime.datetime.utcnow() - datetime.timedelta(minutes=6000)
-
-print(last_actualization.strftime('%Y-%m-%dT%H:%M:%S.%fZ'))
+last_event = ''
 
 while True:
 
@@ -21,22 +19,30 @@ while True:
         access_token = auth.authorize()
 
         # jezeli autoryzacja sie powiodla
-        if access_token != -1:
+        if access_token:
             data = Data(access_token)
 
-            save_attempts = 0
+            if not data.check_last_event(last_event):
+                if last_event == '':
+                    last_event = data.get_latest_event()
 
-            while save_attempts < 5:
+                save_attempts = 0
 
-                # pobierz najnowsze zamowienia i zapisz do bazy danych
-                if data.save_orders(last_actualization.strftime('%Y-%m-%dT%H:%M:%S.%fZ')) != -1:
-                    # zaktualizuj czas ostatniego pobrania danych
-                    last_actualization = datetime.datetime.utcnow()
-                    break
-                save_attempts += 1
+                while save_attempts < 5:
+
+                    save_flag = data.save_orders(last_event)
+                    # pobierz najnowsze zamowienia i zapisz do bazy danych
+                    if save_flag == 1:
+                        last_event = data.get_latest_event()
+                        break
+
+                    elif save_flag == 0:
+                        break
+
+                    save_attempts += 1
                 
-            else:
-                # TODO: obsłużyć ten wyjątek
-                print('Houston mamy problem')
+                else:
+                    # TODO: obsłużyć ten wyjątek
+                    print('Houston mamy problem')
 
     time.sleep(5 * 60)

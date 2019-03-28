@@ -19,8 +19,8 @@ class Auth:
         self.refresh_token = ''
         self.interval = 60
 
-        self.headers = {'Content-type' : 'application/x-www-form-urlencoded',
-                        'Authorization' : 'Basic {}'.format(self.client_basic64)}
+        self.headers = {'Content-type': 'application/x-www-form-urlencoded',
+                        'Authorization': 'Basic {}'.format(self.client_basic64)}
 
     def get_access_code(self):
 
@@ -28,8 +28,8 @@ class Auth:
 
         try:
             access_code_response = requests.post(self.oauth_url,
-                                                    params={'client_id': self.client_id},
-                                                    headers = self.headers)
+                                                 params={'client_id': self.client_id},
+                                                 headers=self.headers)
         except requests.exceptions.RequestException as e:
             print(e)
             return -1
@@ -53,17 +53,16 @@ class Auth:
 
             try:
                 token_response = requests.post(self.token_url,
-                                              data={'device_code': device_code},
-                                              headers = self.headers)
+                                               data={'device_code': device_code},
+                                               headers=self.headers)
             except requests.exceptions.Timeout:
                 print('Przekroczono czas oczekiwania na access_token,\nPonowna próba pobrania...')
                 continue
             except requests.exceptions.RequestException as e:
                 print(e)
-                return -1
+                return False
 
             if token_response:
-
                 print('uzyskano token!')
 
                 self.refresh_token = token_response.json()['refresh_token']
@@ -76,7 +75,7 @@ class Auth:
                 data wygaśnięcia tokenu: {}
                 '''.format(time.ctime(self.token_end_time))
 
-                message.send_email('Wygenerowano token', msg)
+                # message.send_email('Wygenerowano token', msg)
                 break
 
             time.sleep(self.interval)
@@ -88,16 +87,16 @@ class Auth:
         while True:
             try:
                 refresh_response = requests.post(self.refresh_token_url,
-                                            data = {'refresh_token' : self.refresh_token,
-                                                    'grant_type' : 'refresh_token'},
-                                            headers = self.headers)
+                                                 data={'refresh_token': self.refresh_token,
+                                                       'grant_type': 'refresh_token'},
+                                                 headers=self.headers)
             except requests.exceptions.Timeout:
                 print('Przekroczono czas oczekiwania na refresh_token,\nPróba ponownego pobrania...')
                 time.sleep(60)
                 continue
             except requests.exceptions.RequestException as e:
                 print(e)
-                return -1
+                return False
 
             if refresh_response:
                 msg = '''
@@ -110,22 +109,22 @@ class Auth:
                 self.access_token = refresh_response.json()['access_token']
                 self.token_end_time = time.time() + refresh_response.json()['expires_in']
 
-                message.send_email('odswiezanie tokenu',msg)
+                # message.send_email('odswiezanie tokenu',msg)
                 break
 
             time.sleep(self.interval)
 
     def check_token(self):
 
-        if (self.token_end_time - time.time() < 2 * 60 * 60):
+        if self.token_end_time - time.time() < 2 * 60 * 60:
             return False
 
         return True
 
     def authorize(self):
 
-        if (self.access_token != ''):
-            if (self.check_token()):
+        if self.access_token != '':
+            if self.check_token():
                 return self.access_token
             else:
                 self.update_token()
