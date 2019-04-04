@@ -246,7 +246,8 @@ class DBManager:
         self.c.execute('SELECT * FROM deliveryAddresses WHERE AddressID=?', (address_id,))
 
         data = self.c.fetchone()
-        return data[0]
+
+        return data
 
     def get_buyer_by_id(self, buyer_id):
 
@@ -263,6 +264,23 @@ class DBManager:
 
         return data
 
+    def get_buyers_from(self, from_date, limit):
+        self.c.execute('SELECT * FROM buyers WHERE firstOccurrence > ? ORDER BY date(firstOccurrence) LIMIT ?',
+                       (from_date, limit,))
+
+        data = self.c.fetchall()
+
+        return data
+
+    def get_buyers_from_to(self, from_date, to_date):
+
+        self.c.execute('SELECT * FROM buyers WHERE firstOccurrence > ? and firstOccurrence < ? ORDER BY date(firstOccurrence)',
+                       (from_date, to_date,))
+
+        data = self.c.fetchall()
+
+        return data
+
     def get_buyer_delivery_addresses(self, buyer_id):
 
         self.c.execute('SELECT AddressID FROM buyerAddress WHERE BuyerID=?', (buyer_id,))
@@ -270,10 +288,18 @@ class DBManager:
         data = []
 
         for address in self.c.fetchall():
-            data.append(self.get_delivery_address_by_id(address))
+            data.append(self.get_delivery_address_by_id(address[0]))
 
         if len(data) == 0:
             return False
+
+        return data
+
+    def get_buyer_orders(self, buyer_id):
+
+        self.c.execute('SELECT * FROM orders WHERE BuyerID=?', (buyer_id,))
+
+        data = self.c.fetchall()
 
         return data
 
@@ -294,10 +320,10 @@ class DBManager:
 
         return data
 
-    def get_orders_from_to(self, after_date, before_date):
+    def get_orders_from_to(self, from_date, to_date):
 
         self.c.execute('SELECT * FROM orders WHERE OccurredAt > ? and OccurredAt < ? ORDER BY date(OccurredAt)',
-                       (after_date, before_date,))
+                       (from_date, to_date,))
 
         data = self.c.fetchall()
 
@@ -312,7 +338,7 @@ class DBManager:
         if data is None:
             return False
 
-        return data[0]
+        return data
 
     def get_order_items(self, order_id):
 
@@ -321,7 +347,7 @@ class DBManager:
         data = []
 
         for item in self.c.fetchall():
-            data.append(self.c.execute('SELECT * FROM items WHERE ItemID=?', (item,)))
+            data.append(self.get_item_by_id(item[0]))
 
         if len(data) == 0:
             return False
@@ -336,6 +362,4 @@ class DBManager:
 
 
 with DBManager() as db:
-    datar = db.get_last_buyers(5)
-    for row in datar:
-        print(row)
+    print(db.get_order_items('0deaa972-56b6-11e9-9f80-f978a843bacf'))

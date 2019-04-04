@@ -9,7 +9,7 @@ import smtplib
 
 def send_message(subject, message, address):
     # Define these once; use them twice!
-    str_from =  "robert.zydek.98@wp.pl"
+    str_from = "robert.zydek.98@wp.pl"
     str_to = address
 
     # Create the root message and fill in the from, to, and subject headers
@@ -28,10 +28,10 @@ def send_message(subject, message, address):
     msg_alternative.attach(msg_text)
 
     # We reference the image in the IMG SRC attribute by the ID we give it below
-    with open('email/text.txt') as f:
+    with open('email/email.html') as f:
         text = f.read()
         print(text)
-        msg_text = MIMEText(text.rstrip(), 'html')
+        msg_text = MIMEText('no chuj', 'html')
         msg_alternative.attach(msg_text)
 
     # This example assumes the image is in the current directory
@@ -53,5 +53,3 @@ def send_message(subject, message, address):
 
 # send_message('Message with html and image', '', 'rzydek@outlook.com')
 
-with open('email/text.txt', 'r') as f:
-    print(f.read())

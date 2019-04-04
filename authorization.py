@@ -59,7 +59,8 @@ class Auth:
 
             try:
                 token_response = requests.post(self.token_url,
-                                               data={'device_code': device_code},
+                                               data={'device_code': device_code,
+                                                     'grant_type': 'urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code'},
                                                headers=self.headers)
             except requests.exceptions.Timeout:
                 print('Przekroczono czas oczekiwania na access_token,\nPonowna próba pobrania...')
