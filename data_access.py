@@ -75,7 +75,7 @@ class Data:
 
                             address_id = db.find_delivery_address_id(order['delivery']['address'])
 
-                            db.add_buyer(order['buyer'])
+                            db.add_buyer(order['buyer'], time_stamp)
                             db.add_delivery_address(address_id, order['delivery']['address'])
                             db.add_order(order['id'],
                                          order['buyer']['id'],

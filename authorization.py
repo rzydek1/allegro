@@ -1,15 +1,16 @@
 import requests
 import time
+
 import message
 
 
 class Auth:
 
-    def __init__(self, client_id, client_basic64):
+    def __init__(self, client_id, client_basic64, oauth_url, token_url, refresh_token_url):
 
-        self.oauth_url = "https://allegro.pl/auth/oauth/device"
-        self.token_url = "https://allegro.pl/auth/oauth/token?grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"
-        self.refresh_token_url = "https://allegro.pl/auth/oauth/token"
+        self.oauth_url = oauth_url
+        self.token_url = token_url
+        self.refresh_token_url = refresh_token_url
 
         self.client_id = client_id
         self.client_basic64 = client_basic64
@@ -43,6 +44,10 @@ class Auth:
 
             return device_code
 
+        else:
+            raise AuthException(
+                'access_code could not be obtained.\ncheck your client_id and client_basic64 in config.txt.')
+
     def get_token(self):
 
         device_code = self.get_access_code()
@@ -50,6 +55,7 @@ class Auth:
         while True:
 
             token_response = False
+            attempts = 0
 
             try:
                 token_response = requests.post(self.token_url,
@@ -78,13 +84,20 @@ class Auth:
                 # message.send_email('Wygenerowano token', msg)
                 break
 
-            time.sleep(self.interval)
+            if attempts < 5:
+                time.sleep(self.interval)
+            else:
+                raise AuthException('Access_token could not be obtained!')
 
     def update_token(self):
 
         print('odswiezanie tokena')
 
         while True:
+
+            refresh_response = False
+            attempts = 0
+
             try:
                 refresh_response = requests.post(self.refresh_token_url,
                                                  data={'refresh_token': self.refresh_token,
@@ -112,7 +125,10 @@ class Auth:
                 # message.send_email('odswiezanie tokenu',msg)
                 break
 
-            time.sleep(self.interval)
+            if attempts < 5:
+                time.sleep(self.interval)
+            else:
+                raise AuthException('Could not update access_token!')
 
     def check_token(self):
 
@@ -132,3 +148,15 @@ class Auth:
             self.get_token()
 
         return self.access_token
+
+
+class AuthException(Exception):
+    """Exception raised for errors in authorizing Allegro
+
+    Attributes:
+          message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
+

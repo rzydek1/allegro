@@ -1,7 +1,5 @@
 import sqlite3
 import uuid
-from sqlite3.dbapi2 import Cursor
-from typing import List
 
 
 class DBManager:
@@ -52,7 +50,8 @@ class DBManager:
             (BuyerID text PRIMARY KEY,
             Email text,
             Login text,
-            PhoneNumber text)''')
+            PhoneNumber text,
+            FirstOccurrence text)''')
 
         self.c.execute('''CREATE TABLE IF NOT EXISTS buyerAddress
             (BuyerID text,
@@ -99,22 +98,23 @@ class DBManager:
         data = self.c.fetchall()
         print(len(data))
 
-    def add_buyer(self, buyer):
+    def add_buyer(self, buyer, time_stamp):
 
         buyer = (buyer['id'],
                  buyer['email'],
                  buyer['login'],
-                 buyer['phoneNumber'])
+                 buyer['phoneNumber'],
+                 time_stamp)
 
         try:
-            self.c.execute('INSERT INTO buyers VALUES (?, ?, ?, ?)', buyer)
+            self.c.execute('INSERT INTO buyers VALUES (?, ?, ?, ?, ?)', buyer)
         except sqlite3.IntegrityError as e:
-            raise sqlite3.IntegrityError(e)
+            return 0
         except Exception as e:
             print(e)
-            return False
+            return -1
 
-        return True
+        return 1
 
     def add_delivery_address(self, address_id, delivery):
 
@@ -127,12 +127,12 @@ class DBManager:
         try:
             self.c.execute('INSERT INTO deliveryAddresses VALUES (?, ?, ?, ?, ?, ?, ?)', address)
         except sqlite3.IntegrityError as e:
-            raise sqlite3.IntegrityError(e)
+            return 0
         except Exception as e:
             print(e)
-            return False
+            return -1
 
-        return True
+        return 1
 
     def add_order(self, order_id, buyer_id, address_id, order_status, payment_type,
                   delivery_method, total_to_pay, message_to_seller,
@@ -144,12 +144,12 @@ class DBManager:
         try:
             self.c.execute('INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', order)
         except sqlite3.IntegrityError as e:
-            raise sqlite3.IntegrityError(e)
+            return 0
         except Exception as e:
             print(e)
-            return False
+            return -1
 
-        return True
+        return 1
 
     def add_item(self, item_id, item_name, item_price):
 
@@ -159,12 +159,12 @@ class DBManager:
         try:
             self.c.execute('INSERT INTO items VALUES(?, ?, ?)', (item_id, item_name, item_price,))
         except sqlite3.IntegrityError as e:
-            raise sqlite3.IntegrityError(e)
+            return 0
         except Exception as e:
             print(e)
-            return False
+            return -1
 
-        return True
+        return 1
 
     def connect_order_item(self, order_id, item_id, quantity):
 
@@ -172,12 +172,12 @@ class DBManager:
             self.c.execute('INSERT INTO orderItems VALUES (?, ?, ?)', (order_id, item_id, quantity,))
         except sqlite3.IntegrityError:
             print('This connection actually exists')
-            return True
+            return 0
         except Exception as e:
             print(e)
-            return False
+            return -1
 
-        return True
+        return 1
 
     def connect_address_buyer(self, buyer_id, address_id):
 
@@ -185,15 +185,14 @@ class DBManager:
             try:
                 self.c.execute('INSERT INTO buyerAddress VALUES (?, ?)',
                                (buyer_id, address_id[0],))
-                return True
             except sqlite3.IntegrityError:
                 print('This connection actually exists')
-                return True
+                return 0
             except Exception as e:
                 print(e)
-                return False
+                return -1
 
-        return True
+        return 1
 
     def find_order_by_id(self, order_id):
         """Check if there is order with given id"""
@@ -240,7 +239,7 @@ class DBManager:
         if data is None:
             return False
 
-        return data[0]
+        return data
 
     def get_delivery_address_by_id(self, address_id):
 
@@ -254,7 +253,15 @@ class DBManager:
         self.c.execute('SELECT * FROM buyers WHERE BuyerID=?', (buyer_id,))
 
         data = self.c.fetchone()
-        return data[0]
+        return data
+
+    def get_last_buyers(self, limit):
+
+        self.c.execute('SELECT * FROM buyers ORDER BY date(firstOccurrence) LIMIT ?', (limit,))
+
+        data = self.c.fetchall()
+
+        return data
 
     def get_buyer_delivery_addresses(self, buyer_id):
 
@@ -275,7 +282,24 @@ class DBManager:
         self.c.execute('SELECT * FROM orders ORDER BY date(OccurredAt) LIMIT ?', (limit,))
 
         data = self.c.fetchall()
-        print(data)
+
+        return data
+
+    def get_orders_from(self, from_date, limit):
+
+        self.c.execute('SELECT * FROM orders WHERE OccurredAt > ? ORDER BY date(OccurredAt) LIMIT ?',
+                       (from_date, limit,))
+
+        data = self.c.fetchall()
+
+        return data
+
+    def get_orders_from_to(self, after_date, before_date):
+
+        self.c.execute('SELECT * FROM orders WHERE OccurredAt > ? and OccurredAt < ? ORDER BY date(OccurredAt)',
+                       (after_date, before_date,))
+
+        data = self.c.fetchall()
 
         return data
 
@@ -309,3 +333,9 @@ class DBManager:
         if self.db_opened:
             self.conn.commit()
             self.conn.close()
+
+
+with DBManager() as db:
+    datar = db.get_last_buyers(5)
+    for row in datar:
+        print(row)
